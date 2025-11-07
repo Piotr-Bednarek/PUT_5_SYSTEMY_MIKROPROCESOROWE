@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <stdbool.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,6 +85,59 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void zad4() {
+	GPIO_PinState pinState = HAL_GPIO_ReadPin(GPIOC,
+	BUTTON_EXTERNAL_Pin);
+
+	if (pinState == GPIO_PIN_RESET) {
+		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_SET);
+		//			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
+	} else {
+		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_RESET);
+		//			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
+	}
+}
+
+_Bool buttonState(uint16_t pin) {
+	if (pin == BUTTON_EXTERNAL_Pin) {
+		GPIO_PinState pinState = HAL_GPIO_ReadPin(GPIOC,
+		BUTTON_EXTERNAL_Pin);
+
+		return (pinState == GPIO_PIN_RESET);
+
+	} else if (pin == BUTTON_EXTERNAL2_Pin) {
+		GPIO_PinState pinState = HAL_GPIO_ReadPin(GPIOC,
+		BUTTON_EXTERNAL_Pin);
+		return (pinState == GPIO_PIN_SET);
+	}
+	return false;
+}
+
+void zad5() {
+	GPIO_PinState pinStatePullUp = HAL_GPIO_ReadPin(GPIOC,
+	BUTTON_EXTERNAL_Pin);
+	GPIO_PinState pinStatePullDown = HAL_GPIO_ReadPin(GPIOC,
+	BUTTON_EXTERNAL2_Pin);
+
+	if (pinStatePullUp == GPIO_PIN_RESET) {
+		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_SET);
+	}
+
+	if (pinStatePullDown == GPIO_PIN_SET) {
+		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_RESET);
+	}
+}
+
+//void zad5() {
+//	if (buttonState(BUTTON_EXTERNAL_Pin)) {
+//		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_SET);
+//	}
+//
+//	if (buttonState(BUTTON_EXTERNAL2_Pin)) {
+//		HAL_GPIO_WritePin(GPIOB, LED_EXTERNAL_Pin, GPIO_PIN_RESET);
+//	}
+//}
+
 /* USER CODE END 0 */
 
 /**
@@ -124,15 +179,9 @@ int main(void) {
 	/* USER CODE BEGIN WHILE */
 	while (1) {
 
-		GPIO_PinState buttonState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2);
+//		zad4();
+		zad5();
 
-		if (buttonState == GPIO_PIN_RESET) {
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);   // LED_EXT ON
-			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);      // LD1 ON
-		} else {
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET); // LED_EXT OFF
-			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);    // LD1 OFF
-		}
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -327,7 +376,7 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOG_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LD1_Pin | LED_EXT_Pin | LD3_Pin | LD2_Pin,
+	HAL_GPIO_WritePin(GPIOB, LD1_Pin | LED_EXTERNAL_Pin | LD3_Pin | LD2_Pin,
 			GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
@@ -340,14 +389,20 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pin : BUTTON_EXT_Pin */
-	GPIO_InitStruct.Pin = BUTTON_EXT_Pin;
+	/*Configure GPIO pin : BUTTON_EXTERNAL_Pin */
+	GPIO_InitStruct.Pin = BUTTON_EXTERNAL_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	HAL_GPIO_Init(BUTTON_EXT_GPIO_Port, &GPIO_InitStruct);
+	HAL_GPIO_Init(BUTTON_EXTERNAL_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LD1_Pin LED_EXT_Pin LD2_Pin */
-	GPIO_InitStruct.Pin = LD1_Pin | LED_EXT_Pin | LD2_Pin;
+	/*Configure GPIO pin : BUTTON_EXTERNAL2_Pin */
+	GPIO_InitStruct.Pin = BUTTON_EXTERNAL2_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+	HAL_GPIO_Init(BUTTON_EXTERNAL2_GPIO_Port, &GPIO_InitStruct);
+
+	/*Configure GPIO pins : LD1_Pin LED_EXTERNAL_Pin LD2_Pin */
+	GPIO_InitStruct.Pin = LD1_Pin | LED_EXTERNAL_Pin | LD2_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

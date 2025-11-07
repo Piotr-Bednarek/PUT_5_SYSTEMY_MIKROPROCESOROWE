@@ -63,8 +63,10 @@ void Error_Handler(void);
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1
 #define RMII_MDC_GPIO_Port GPIOC
-#define BUTTON_EXT_Pin GPIO_PIN_2
-#define BUTTON_EXT_GPIO_Port GPIOC
+#define BUTTON_EXTERNAL_Pin GPIO_PIN_2
+#define BUTTON_EXTERNAL_GPIO_Port GPIOC
+#define BUTTON_EXTERNAL2_Pin GPIO_PIN_3
+#define BUTTON_EXTERNAL2_GPIO_Port GPIOC
 #define RMII_REF_CLK_Pin GPIO_PIN_1
 #define RMII_REF_CLK_GPIO_Port GPIOA
 #define RMII_MDIO_Pin GPIO_PIN_2
@@ -77,8 +79,8 @@ void Error_Handler(void);
 #define RMII_RXD1_GPIO_Port GPIOC
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
-#define LED_EXT_Pin GPIO_PIN_2
-#define LED_EXT_GPIO_Port GPIOB
+#define LED_EXTERNAL_Pin GPIO_PIN_2
+#define LED_EXTERNAL_GPIO_Port GPIOB
 #define RMII_TXD1_Pin GPIO_PIN_13
 #define RMII_TXD1_GPIO_Port GPIOB
 #define LD3_Pin GPIO_PIN_14

@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <stdio.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,14 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-const uint32_t MIN_PERIOD_US = 5000;
-const uint32_t MAX_PERIOD_US = 2000000;
-const uint32_t STEP_PERIOD_US = 100000;
-const uint32_t DEBOUNCE_TIME_MS = 200;
 
-uint32_t current_period_us = MIN_PERIOD_US;
-uint32_t last_button_time = 0;
-//uint32_t current_period_us = MIN_PERIOD_US;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -95,71 +90,88 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+uint32_t last_button_time = 0;
+const uint32_t DEBOUNCE_TIME_MS = 200;
+
+_Bool pulse_active = 0;
+
 GPIO_PinState LD1_State;
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == TIM2) {
-		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-		LD1_State = HAL_GPIO_ReadPin(GPIOB, LD2_Pin);
+uint32_t current_period_ms = 400;
+uint32_t current_period_us;
+
+uint32_t pulse_duration_ms = 200;
+uint32_t pulse_arr_value;
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == USER_Btn_Pin) {
+		uint32_t now = HAL_GetTick();
+		if (now - last_button_time < DEBOUNCE_TIME_MS)
+			return;
+		last_button_time = now;
+
+		HAL_TIM_Base_Stop_IT(&htim2);
+
+		__HAL_TIM_SET_COUNTER(&htim2, 0);
+		__HAL_TIM_SET_AUTORELOAD(&htim2, current_period_us - 1);
+
+		HAL_TIM_Base_Start_IT(&htim2);
 	}
 }
 
-//_Bool buttonState(uint16_t pin) {
-//	if (pin == BUTTON_UP_Pin) {
-//		GPIO_PinState pinState = HAL_GPIO_ReadPin(GPIOB, BUTTON_UP_Pin);
-//		return (pinState == GPIO_PIN_RESET);
-//	} else if (pin == BUTTON_DOWN_Pin) {
-//		GPIO_PinState pinState = HAL_GPIO_ReadPin(GPIOB, BUTTON_DOWN_Pin);
-//		return (pinState == GPIO_PIN_SET);
-//	}
-//	return false;
-//}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if (htim->Instance == TIM2) {
+		HAL_TIM_Base_Stop_IT(&htim2);
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+		HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+		pulse_active = 1;
 
-	if (GPIO_Pin == BUTTON_UP_Pin) {
-		HAL_GPIO_TogglePin(GPIOB, LD1_Pin_Pin);  // debug — inna dioda
-	}
-	if (GPIO_Pin == BUTTON_DOWN_Pin) {
-		HAL_GPIO_TogglePin(GPIOB, LD3_Pin_Pin);  // debug — inna dioda
+		__HAL_TIM_SET_COUNTER(&htim3, 0);
+		__HAL_TIM_SET_AUTORELOAD(&htim3, pulse_arr_value);
+		HAL_TIM_Base_Start_IT(&htim3);
 	}
 
-	if (GPIO_Pin == BUTTON_DOWN_Pin) {
-		uint32_t now = HAL_GetTick();
-		if (now - last_button_time < DEBOUNCE_TIME_MS)
-			return;
+	if (htim->Instance == TIM3 && pulse_active) {
+		HAL_TIM_Base_Stop_IT(&htim3);
+		HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+		pulse_active = 0;
+	}
+}
 
-		last_button_time = now;
+uint8_t rxBuffer[50];
+char txBuffer[50];
 
-		current_period_us -= STEP_PERIOD_US;
-		if (current_period_us < MIN_PERIOD_US) {
-			current_period_us += STEP_PERIOD_US;
+const uint32_t MIN_PERIOD_US = 200000;      // 200 ms
+const uint32_t MAX_PERIOD_US = 2000000;     // 2 s
+const uint32_t STEP_PERIOD_US = 200000;     // 0,2 s
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART3) {
+		if (rxBuffer[0] == '+') {
+			if (current_period_us + STEP_PERIOD_US <= MAX_PERIOD_US)
+				current_period_us += STEP_PERIOD_US;
+		} else if (rxBuffer[0] == '-') {
+			if (current_period_us >= MIN_PERIOD_US + STEP_PERIOD_US)
+				current_period_us -= STEP_PERIOD_US;
 		}
 
-		HAL_TIM_Base_Stop_IT(&htim2);
-		__HAL_TIM_SET_AUTORELOAD(&htim2, current_period_us - 1);
-		__HAL_TIM_SET_COUNTER(&htim2, 0);
-		HAL_TIM_Base_Start_IT(&htim2);
+		uint32_t period_ms = current_period_us / 1000;
+		GPIO_PinState led_state = HAL_GPIO_ReadPin(GPIOB, LD2_Pin);
+
+		sprintf(txBuffer, "Okres: %lu ms\r\n", period_ms);
+
+		HAL_UART_Transmit(&huart3, (uint8_t*) txBuffer, strlen(txBuffer), HAL_MAX_DELAY);
+		HAL_UART_Receive_IT(&huart3, rxBuffer, 1);
 	}
+}
 
-	if (GPIO_Pin == BUTTON_UP_Pin) {
-		uint32_t now = HAL_GetTick();
-		if (now - last_button_time < DEBOUNCE_TIME_MS)
-			return;
+void zad1() {
+	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE) != RESET) {
+		__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
 
-		last_button_time = now;
-
-		current_period_us += STEP_PERIOD_US;
-		if (current_period_us > MAX_PERIOD_US) {
-			current_period_us -= STEP_PERIOD_US;
-		}
-
-		HAL_TIM_Base_Stop_IT(&htim2);
-		__HAL_TIM_SET_AUTORELOAD(&htim2, current_period_us - 1);
-		__HAL_TIM_SET_COUNTER(&htim2, 0);
-		HAL_TIM_Base_Start_IT(&htim2);
+		LD1_State = !LD1_State;
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 	}
-
 }
 
 /* USER CODE END 0 */
@@ -171,6 +183,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 int main(void) {
 
 	/* USER CODE BEGIN 1 */
+
+	current_period_us = current_period_ms * 1000;
+	pulse_arr_value = (pulse_duration_ms * 10) - 1;
 
 	/* USER CODE END 1 */
 
@@ -198,16 +213,24 @@ int main(void) {
 	MX_TIM3_Init();
 	MX_TIM2_Init();
 	/* USER CODE BEGIN 2 */
+
+//	HAL_TIM_Base_Start(&htim2); // zad1
 	HAL_TIM_Base_Start_IT(&htim2);
+//	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_UART_Receive_IT(&huart3, rxBuffer, 1);
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+
+//		zad1();
+
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+//		HAL_Delay(10);
 	}
 	/* USER CODE END 3 */
 }
@@ -253,8 +276,7 @@ void SystemClock_Config(void) {
 
 	/** Initializes the CPU, AHB and APB buses clocks
 	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
 	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
 	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
 	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
@@ -303,8 +325,7 @@ static void MX_ETH_Init(void) {
 	}
 
 	memset(&TxConfig, 0, sizeof(ETH_TxPacketConfig));
-	TxConfig.Attributes = ETH_TX_PACKETS_FEATURES_CSUM
-			| ETH_TX_PACKETS_FEATURES_CRCPAD;
+	TxConfig.Attributes = ETH_TX_PACKETS_FEATURES_CSUM | ETH_TX_PACKETS_FEATURES_CRCPAD;
 	TxConfig.ChecksumCtrl = ETH_CHECKSUM_IPHDR_PAYLOAD_INSERT_PHDR_CALC;
 	TxConfig.CRCPadCtrl = ETH_CRC_PAD_INSERT;
 	/* USER CODE BEGIN ETH_Init 2 */
@@ -333,7 +354,7 @@ static void MX_TIM2_Init(void) {
 	htim2.Instance = TIM2;
 	htim2.Init.Prescaler = 95;
 	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 4999;
+	htim2.Init.Period = 999;
 	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
@@ -345,8 +366,7 @@ static void MX_TIM2_Init(void) {
 	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig)
-			!= HAL_OK) {
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK) {
 		Error_Handler();
 	}
 	/* USER CODE BEGIN TIM2_Init 2 */
@@ -368,15 +388,14 @@ static void MX_TIM3_Init(void) {
 
 	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
 	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
-	TIM_OC_InitTypeDef sConfigOC = { 0 };
 
 	/* USER CODE BEGIN TIM3_Init 1 */
 
 	/* USER CODE END TIM3_Init 1 */
 	htim3.Instance = TIM3;
-	htim3.Init.Prescaler = 95;
+	htim3.Init.Prescaler = 9599;
 	htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim3.Init.Period = 999;
+	htim3.Init.Period = 1999;
 	htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
@@ -386,35 +405,14 @@ static void MX_TIM3_Init(void) {
 	if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_TIM_PWM_Init(&htim3) != HAL_OK) {
-		Error_Handler();
-	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-	if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 500;
-	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3)
-			!= HAL_OK) {
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
 		Error_Handler();
 	}
 	/* USER CODE BEGIN TIM3_Init 2 */
 
 	/* USER CODE END TIM3_Init 2 */
-	HAL_TIM_MspPostInit(&htim3);
 
 }
 
@@ -433,7 +431,7 @@ static void MX_USART3_UART_Init(void) {
 
 	/* USER CODE END USART3_Init 1 */
 	huart3.Instance = USART3;
-	huart3.Init.BaudRate = 115200;
+	huart3.Init.BaudRate = 9600;
 	huart3.Init.WordLength = UART_WORDLENGTH_8B;
 	huart3.Init.StopBits = UART_STOPBITS_1;
 	huart3.Init.Parity = UART_PARITY_NONE;
@@ -504,12 +502,10 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOG_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOB, LD1_Pin_Pin | LD4_Pin_Pin | LD3_Pin_Pin | LD2_Pin,
-			GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | LD4_Pin_Pin | LD3_Pin | LD2_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin,
-			GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : USER_Btn_Pin */
 	GPIO_InitStruct.Pin = USER_Btn_Pin;
@@ -517,18 +513,12 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : LD1_Pin_Pin LD4_Pin_Pin LD3_Pin_Pin LD2_Pin */
-	GPIO_InitStruct.Pin = LD1_Pin_Pin | LD4_Pin_Pin | LD3_Pin_Pin | LD2_Pin;
+	/*Configure GPIO pins : PB0 LD4_Pin_Pin LD3_Pin LD2_Pin */
+	GPIO_InitStruct.Pin = GPIO_PIN_0 | LD4_Pin_Pin | LD3_Pin | LD2_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-	/*Configure GPIO pin : BUTTON_UP_Pin */
-	GPIO_InitStruct.Pin = BUTTON_UP_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	HAL_GPIO_Init(BUTTON_UP_GPIO_Port, &GPIO_InitStruct);
 
 	/*Configure GPIO pin : USB_PowerSwitchOn_Pin */
 	GPIO_InitStruct.Pin = USB_PowerSwitchOn_Pin;
@@ -543,19 +533,7 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pin : BUTTON_DOWN_Pin */
-	GPIO_InitStruct.Pin = BUTTON_DOWN_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-	HAL_GPIO_Init(BUTTON_DOWN_GPIO_Port, &GPIO_InitStruct);
-
 	/* EXTI interrupt init*/
-	HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(EXTI2_IRQn);
-
-	HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(EXTI4_IRQn);
-
 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 

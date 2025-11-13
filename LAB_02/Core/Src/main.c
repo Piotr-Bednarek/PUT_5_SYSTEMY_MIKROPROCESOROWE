@@ -82,46 +82,89 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t rxBuffer[4];
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-
-	char numberChar = rxBuffer[2];
-	char stateChar = rxBuffer[3];
-
-	int ledNumber = numberChar - '0';
-	int ledState = stateChar - '0';
-
-	switch (ledNumber) {
-	case 1:
-		if (ledState == 1) {
-			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
-		} else if (ledState == 0) {
-			HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
-		}
-		break;
-	case 2:
-		if (ledState == 1) {
-			HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
-		} else if (ledState == 0) {
-			HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
-		}
-		break;
-	case 3:
-		if (ledState == 1) {
-			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-		} else if (ledState == 0) {
-			HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
-		}
-		break;
-	default:
-		break;
-	}
-
-	HAL_UART_Receive_IT(&huart3, rxBuffer, 4);
-
+void UART_TransmitMessage(char *msg) {
+    HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 }
 
+uint8_t rx_byte;
+uint8_t rxBuffer[256]; // piszcie zawsze jaki jest format wiadomosci bo bez tego jest kaplica dlatego jakis error handling z
+uint16_t idx=0;			// format wiadomosc : LDxy
+
+char conditionListPin[3]={'1','2','3'};
+char conditionListState[2]={'1','0'};
+char conditionListInit[2]={'L','D'};
+
+void processMessage(char *msg){
+
+		if(msg[0]!='L' ||
+				msg[1]!='D' ||
+				strchr(conditionListPin, msg[2]) == NULL ||       //strchr zwraca pointer do znaku kiedy znak znajduje sie na liscie w naszym przypadku sprawdzamy czy go nie ma wiec == null
+		        strchr(conditionListState, msg[3]) == NULL )
+		{
+			UART_TransmitMessage("Wrong message format: LDxy where x is led number(1..3) and y is pin state (1-on, 0-off)\r\n");
+		}
+
+		//logika funkcji do dodania custom w zaleznosci od prj
+		char numberChar = msg[2];
+		char stateChar = msg[3];
+
+		int ledNumber = numberChar - '0';
+		int ledState = stateChar - '0';
+
+		switch (ledNumber) {
+		case 1:
+			if (ledState == 1) {
+				HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
+				//UART_TransmitMessage((char)(ledNumber));
+			} else if (ledState == 0) {
+				HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
+			}
+			break;
+		case 2:
+			if (ledState == 1) {
+				HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+			} else if (ledState == 0) {
+				HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+			}
+			break;
+		case 3:
+			if (ledState == 1) {
+				HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
+			} else if (ledState == 0) {
+				HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+			}
+			break;
+		default:
+			break;
+		}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART3)
+	    {
+	        uint8_t byte = rx_byte;
+
+	        if (byte == '\r')
+	        {
+	            rxBuffer[idx] = '\0';
+	            processMessage(rxBuffer);
+	            idx = 0;
+	        }
+	        else
+	        {
+	            if (idx < 256 - 1)
+	            {
+	                rxBuffer[idx++] = byte;
+	            }
+	            else
+	            {
+	                idx = 0;   // overflow handling
+	            }
+	        }
+	        HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+	    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -157,15 +200,15 @@ int main(void) {
 	MX_USB_OTG_FS_PCD_Init();
 	/* USER CODE BEGIN 2 */
 
-	HAL_UART_Receive_IT(&huart3, rxBuffer, 4);
-
+	//HAL_UART_Receive_IT(&huart3, rxBuffer, 4);
+	HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+		HAL_Delay(10);
 		/* USER CODE END WHILE */
-
 		/* USER CODE BEGIN 3 */
 	}
 	/* USER CODE END 3 */

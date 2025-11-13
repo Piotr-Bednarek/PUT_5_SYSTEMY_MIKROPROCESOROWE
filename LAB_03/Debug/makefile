@@ -34,34 +34,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := Project1
+BUILD_ARTIFACT_NAME := LAB_03
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-Project1.elf \
+LAB_03.elf \
 
 MAP_FILES += \
-Project1.map \
+LAB_03.map \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-Project1.list \
+LAB_03.list \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: Project1.elf secondary-outputs
+main-build: LAB_03.elf secondary-outputs
 
 # Tool invocations
-Project1.elf Project1.map: $(OBJS) $(USER_OBJS) C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_03\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Project1.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_03\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Project1.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+LAB_03.elf LAB_03.map: $(OBJS) $(USER_OBJS) C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_03\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "LAB_03.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_03\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LAB_03.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -70,14 +70,14 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-Project1.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "Project1.list"
+LAB_03.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "LAB_03.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) Project1.elf Project1.list Project1.map default.size.stdout
+	-$(RM) LAB_03.elf LAB_03.list LAB_03.map default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)

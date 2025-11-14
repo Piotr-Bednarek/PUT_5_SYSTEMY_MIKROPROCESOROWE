@@ -1,0 +1,3 @@
+../Core/Src/UartMessageHandler.cpp:21:1:UartMessageHandler::UartMessageHandler(UART_HandleTypeDef*)	16	static
+../Core/Src/UartMessageHandler.cpp:26:6:void UartMessageHandler::receiveByte(uint8_t)	16	static
+../Core/Src/UartMessageHandler.cpp:38:6:void UartMessageHandler::processMessage()	40	static

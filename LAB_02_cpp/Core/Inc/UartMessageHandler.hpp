@@ -21,6 +21,7 @@ private:
     uint16_t idx = 0;
 
     void processMessage();
+    void transmitMessage(const char* msg);
 };
 
 #endif

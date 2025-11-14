@@ -9,6 +9,7 @@
 #include <cstring>   // for memset
 #include <cstdlib>   // for atoi
 #include <cstdio>    // for sprintf if needed
+#include <string>
 
 // Wrap HAL headers in extern "C"
 extern "C" {
@@ -35,6 +36,10 @@ void UartMessageHandler::receiveByte(uint8_t byte) {
     }
 }
 
+void UartMessageHandler::transmitMessage(const char* msg){
+	HAL_UART_Transmit(huart_, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+}
+
 void UartMessageHandler::processMessage() {
     // basic validation
     if (rxBuffer[0] != 'L' || rxBuffer[1] != 'D' ||
@@ -42,8 +47,16 @@ void UartMessageHandler::processMessage() {
         strchr(conditionListState, rxBuffer[3]) == nullptr)
     {
         const char* msg = "Wrong message format: LDxy where x=1..3, y=0/1\r\n";
-        HAL_UART_Transmit(huart_, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        transmitMessage(msg);
         return;
+    }
+
+    if (strlen(rxBuffer)!=4){
+    	const char* msg = "WARNING! stick to the format: LDxy where x=1..3, y=0/1\r\n";
+    	transmitMessage(msg);
+
+    	//std::string lenStr = std::to_string(strlen((char*)rxBuffer)); check dlugosci wiadomosci jakims cudem jest 4 nie dotkne nigdy debugera moglem to zrobic w 5 sekund ale nie
+    	//transmitMessage(lenStr.c_str());
     }
 
     int ledNumber = rxBuffer[2] - '0';
@@ -63,6 +76,10 @@ void UartMessageHandler::processMessage() {
         	break;
     }
 }
+
+
+
+
 
 
 

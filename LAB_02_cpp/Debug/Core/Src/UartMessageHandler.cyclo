@@ -1,3 +1,4 @@
-../Core/Src/UartMessageHandler.cpp:21:1:UartMessageHandler::UartMessageHandler(UART_HandleTypeDef*)	1
-../Core/Src/UartMessageHandler.cpp:26:6:void UartMessageHandler::receiveByte(uint8_t)	3
-../Core/Src/UartMessageHandler.cpp:38:6:void UartMessageHandler::processMessage()	12
+../Core/Src/UartMessageHandler.cpp:22:1:UartMessageHandler::UartMessageHandler(UART_HandleTypeDef*)	1
+../Core/Src/UartMessageHandler.cpp:27:6:void UartMessageHandler::receiveByte(uint8_t)	3
+../Core/Src/UartMessageHandler.cpp:39:6:void UartMessageHandler::transmitMessage(const char*)	1
+../Core/Src/UartMessageHandler.cpp:43:6:void UartMessageHandler::processMessage()	13

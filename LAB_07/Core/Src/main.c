@@ -212,10 +212,6 @@ float adc_mV_avg;
 
 int n = 100;
 
-void UART_TransmitMessage(char *msg) {
-	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
-}
-
 void zad5_goat() {
 
 	float adc_samples[n];

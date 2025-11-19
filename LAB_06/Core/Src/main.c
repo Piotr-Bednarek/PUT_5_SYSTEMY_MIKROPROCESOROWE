@@ -300,6 +300,8 @@ int32_t BMP280_CalcPressure(int32_t adc_P) {
 	return (int32_t) p;  // Uwaga: wynik w Q24.8 -> Pa = p/256
 }
 
+float tempC;
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	// zad 2 - odpal debuggera i odczytaj temp
 	// zad 3 - temperatura po uarcie do terminala
@@ -313,7 +315,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 
 		int32_t rawTemp = BMP280_ReadRawTemperature();
-		float tempC = BMP280_CalcTemperature(rawTemp);
+		tempC = BMP280_CalcTemperature(rawTemp);
 
 		static uint32_t counter = 0; //zad 6
 		float time_s = counter; // zad 6

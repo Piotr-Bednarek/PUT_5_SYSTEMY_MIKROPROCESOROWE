@@ -60,8 +60,8 @@ all: main-build
 main-build: LAB_02.elf secondary-outputs
 
 # Tool invocations
-LAB_02.elf LAB_02.map: $(OBJS) $(USER_OBJS) C:\Users\janek\Documents\repostm\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_02\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "LAB_02.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\janek\Documents\repostm\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_02\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LAB_02.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+LAB_02.elf LAB_02.map: $(OBJS) $(USER_OBJS) C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_02\STM32F767ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "LAB_02.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Piotr\STM32CubeIDE\workspace_1.19.0\PUT_5_SYSTEMY_MIKROPROCESOROWE\LAB_02\STM32F767ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LAB_02.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

@@ -23,6 +23,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "signal.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,6 +72,7 @@ DMA_HandleTypeDef hdma_dac1;
 ETH_HandleTypeDef heth;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart3;
 
@@ -84,12 +91,120 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_DAC_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+#define ZADANIE 5
+
+void DAC_SetVoltage(float volts) {
+
+	float value = volts / 3.3 * 4095;
+
+	HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, value);
+
+}
+
+#define SAMPLES 100
+
+uint32_t signal_idx = 0;
+
+uint32_t sin_table[SAMPLES] = { 1250, 1329, 1408, 1487, 1564, 1640, 1715, 1787, 1858, 1926, 1991, 2053, 2113, 2168,
+		2220, 2268, 2312, 2352, 2387, 2418, 2444, 2465, 2481, 2492, 2499, 2500, 2496, 2487, 2474, 2455, 2431, 2403,
+		2370, 2333, 2291, 2245, 2195, 2141, 2083, 2023, 1959, 1892, 1823, 1751, 1678, 1602, 1525, 1448, 1369, 1290,
+		1210, 1131, 1052, 975, 898, 822, 749, 677, 608, 541, 477, 417, 359, 305, 255, 209, 167, 130, 97, 69, 45, 26, 13,
+		4, 0, 1, 8, 19, 35, 56, 82, 113, 148, 188, 232, 280, 332, 387, 447, 509, 574, 642, 713, 785, 860, 936, 1013,
+		1092, 1171, 1250 };
+
+uint32_t current_value;
+
+float volts;
+
+float scale;
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if (htim->Instance == TIM3) {
+
+#if ZADANIE == 2 || ZADANIE == 3
+		current_value = sin_table[signal_idx] * scale;
+
+		volts = ((float) current_value / 4095.0f) * 3.3f;
+
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current_value);
+		signal_idx++;
+
+		if (signal_idx == SAMPLES) {
+			signal_idx = 0;
+		}
+
+#endif
+
+#if ZADANIE == 4
+
+		current_value = signal_data[signal_idx];
+
+		HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current_value);
+
+		signal_idx++;
+		if (signal_idx == SIGNAL_SIZE) {
+			signal_idx = 0;
+		}
+
+#endif
+
+	}
+}
+
+void UART_TransmitMessage(char *msg) {
+	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+}
+
+uint8_t rx_byte;
+uint8_t rxBuffer[256];
+uint16_t idx = 0;
+
+float receivedValue;
+
+void processMessage(char *msg) {
+
+	receivedValue = strtof((char*) msg, NULL);
+
+	if (receivedValue > 2.0f)
+		receivedValue = 2.0f;
+
+	if (receivedValue < 0.0f)
+		receivedValue = 0.0f;
+
+	scale = receivedValue / 2.0f;
+
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART3) {
+		uint8_t byte = rx_byte;
+
+		if (byte == '\r') {
+			rxBuffer[idx] = '\0';
+			processMessage((char*) rxBuffer);
+			idx = 0;
+		} else {
+			if (idx < 256 - 1) {
+				rxBuffer[idx++] = byte;
+			} else {
+				idx = 0;   // overflow handling
+			}
+		}
+		HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+	}
+}
+
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef *hdac) {
+	current_value = signal_data[SIGNAL_SIZE - 1]; // ostatnia wartość w cyklu
+}
 
 /* USER CODE END 0 */
 
@@ -127,15 +242,56 @@ int main(void) {
 	MX_USB_OTG_FS_PCD_Init();
 	MX_DAC_Init();
 	MX_TIM2_Init();
+	MX_TIM3_Init();
 	/* USER CODE BEGIN 2 */
 
-	HAL_DAC_Start();
+#if ZADANIE == 1
+	HAL_TIM_Base_Start(&htim2);
+
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
+	DAC_SetVoltage(2.11);
+
+#endif
+
+#if ZADANIE == 2
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
+#endif
+
+#if ZADANIE == 3
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
+	HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+
+#endif
+
+#if ZADANIE == 4
+	HAL_TIM_Base_Start(&htim2);
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
+#endif
+
+#if ZADANIE == 5
+	HAL_TIM_Base_Start(&htim2);
+//	HAL_TIM_Base_Start_IT(&htim3);
+//	HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+	HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t*) signal_data, SIGNAL_SIZE, DAC_ALIGN_12B_R);
+//	HAL_TIM_Base_Start(&htim3);
+
+#endif
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+		HAL_Delay(10);
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -321,6 +477,47 @@ static void MX_TIM2_Init(void) {
 }
 
 /**
+ * @brief TIM3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM3_Init(void) {
+
+	/* USER CODE BEGIN TIM3_Init 0 */
+
+	/* USER CODE END TIM3_Init 0 */
+
+	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+	/* USER CODE BEGIN TIM3_Init 1 */
+
+	/* USER CODE END TIM3_Init 1 */
+	htim3.Instance = TIM3;
+	htim3.Init.Prescaler = 959;
+	htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim3.Init.Period = 99;
+	htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
+		Error_Handler();
+	}
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM3_Init 2 */
+
+	/* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
  * @brief USART3 Initialization Function
  * @param None
  * @retval None
@@ -335,7 +532,7 @@ static void MX_USART3_UART_Init(void) {
 
 	/* USER CODE END USART3_Init 1 */
 	huart3.Instance = USART3;
-	huart3.Init.BaudRate = 115200;
+	huart3.Init.BaudRate = 9600;
 	huart3.Init.WordLength = UART_WORDLENGTH_8B;
 	huart3.Init.StopBits = UART_STOPBITS_1;
 	huart3.Init.Parity = UART_PARITY_NONE;

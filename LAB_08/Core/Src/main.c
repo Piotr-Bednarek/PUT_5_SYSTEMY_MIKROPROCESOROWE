@@ -49,14 +49,14 @@
 /* Private variables ---------------------------------------------------------*/
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma location=0x2007c000
-ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
 #pragma location=0x2007c0a0
-ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
 
 #elif defined ( __CC_ARM )  /* MDK ARM Compiler */
 
-__attribute__((at(0x2007c000))) ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
-__attribute__((at(0x2007c0a0))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
+__attribute__((at(0x2007c000))) ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
+__attribute__((at(0x2007c0a0))) ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
 
@@ -99,7 +99,7 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define ZADANIE 5
+#define ZADANIE 3
 
 void DAC_SetVoltage(float volts) {
 
@@ -124,7 +124,7 @@ uint32_t current_value;
 
 float volts;
 
-float scale;
+float scale = 1.0f;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM3) {
@@ -140,6 +140,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		if (signal_idx == SAMPLES) {
 			signal_idx = 0;
 		}
+
+		char buffer[32];
+
+//		int calkowita = (int) volts;
+
+// Odejmujemy cześć całkowitą, mnożymy przez 100 (dla 2 miejsc po przecinku) i znowu rzutujemy
+//		int ulamkowa = (int) ((volts - calkowita) * 100);
+
+//// %d.%02d oznacza: liczba, kropka, liczba (uzupełniona zerem jeśli <10, np. .05)
+//		sprintf(buffer, "%d\r\n", current_value);
+//		UART_TransmitMessage(buffer);
 
 #endif
 

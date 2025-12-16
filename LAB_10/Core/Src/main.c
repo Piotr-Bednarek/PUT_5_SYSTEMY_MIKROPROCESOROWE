@@ -24,17 +24,16 @@
 /* USER CODE BEGIN Includes */
 
 #include "arm_math.h"
-
-#include "A_mat.h"
-#include "B_mat.h"
-#include "C_mat.h"
-#include "C_REF_mat.h"
-
 #include <stdio.h>
+#include <math.h>
 
 #include "FIR_COEFFS.h"
 #include "TEST_SIGNAL.h"
 #include "REF_SIGNAL.h"
+#include "A_mat.h"
+#include "B_mat.h"
+#include "C_mat.h"
+#include "C_REF_mat.h"
 
 /* USER CODE END Includes */
 
@@ -73,6 +72,9 @@ ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecr
 
 ETH_TxPacketConfig TxConfig;
 
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 ETH_HandleTypeDef heth;
 
 UART_HandleTypeDef huart3;
@@ -80,15 +82,20 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-
+volatile float32_t g_adc_raw = 0.0f;
+volatile float32_t g_adc_filtered = 0.0f;
+uint32_t adc_raw = 0;
+uint32_t adc_mV = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_ETH_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -96,7 +103,10 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define ZADANIE 2
+#define ZADANIE 3
+
+#define BLOCK_SIZE 32
+#define NUM_TAPS_FIR 55 // As estmated or defined in FIR_COEFFS (length of coeffs)
 
 float32_t RMSE(const float32_t *y, const float32_t *yref, const uint32_t len) {
 	float32_t err[len];
@@ -105,8 +115,6 @@ float32_t RMSE(const float32_t *y, const float32_t *yref, const uint32_t len) {
 	arm_rms_f32(err, len, &rmse);
 	return rmse;
 }
-
-#define BLOCK_SIZE 32  // blok próbek przetwarzanych na raz (można dopasować)
 
 void UART_SendFloatArrayCSV(UART_HandleTypeDef *huart, float32_t *data, uint32_t length) {
 	HAL_UART_Transmit(huart, (uint8_t*) "CSV data:\r\n", 12, HAL_MAX_DELAY);
@@ -128,7 +136,6 @@ void UART_SendFloatArrayCSV(UART_HandleTypeDef *huart, float32_t *data, uint32_t
 			frac = 0;
 
 		// 2. Formatuj z uwzględnieniem znaku ręcznie (używamy %c dla znaku)
-		// Usuwamy spację jeśli plus, żeby nie psuć CSV, albo po prostu warunek:
 		if (sign == '-') {
 			sprintf(buf, "-%d.%06d", whole, frac);
 		} else {
@@ -144,7 +151,6 @@ void UART_SendFloatArrayCSV(UART_HandleTypeDef *huart, float32_t *data, uint32_t
 		HAL_UART_Transmit(huart, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
 	}
 }
-
 /* USER CODE END 0 */
 
 /**
@@ -175,9 +181,11 @@ int main(void) {
 
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
+	MX_DMA_Init();
 	MX_ETH_Init();
 	MX_USART3_UART_Init();
 	MX_USB_OTG_FS_PCD_Init();
+	MX_ADC1_Init();
 	/* USER CODE BEGIN 2 */
 
 #if ZADANIE == 1
@@ -205,7 +213,6 @@ int main(void) {
 
 	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 
-
 #endif
 
 #if ZADANIE == 2
@@ -227,16 +234,16 @@ int main(void) {
 		arm_fir_f32(&S, &TEST_SIGNAL[i], &y_test[i], blkSize);
 	}
 
-	float32_t rmse = RMSE(y_test, REF_SIGNAL, SIGNAL_LENGTH);
+	float32_t rmse_fir = RMSE(y_test, REF_SIGNAL, SIGNAL_LENGTH);
 
 	char msg[64];
-	int whole = (int) rmse;
-	int frac = (int) ((rmse - whole) * 1000000); // 6 cyfr po przecinku
+	int whole_fir = (int) rmse_fir;
+	int frac_fir = (int) ((rmse_fir - whole_fir) * 1000000);
 
-	if (rmse < 1e-6f) { // kryterium sukcesu
-		sprintf(msg, "FIR test passed! rmse = %d.%06d\r\n", whole, frac);
+	if (rmse_fir < 1e-6f) { // kryterium sukcesu
+		sprintf(msg, "FIR test passed! rmse = %d.%06d\r\n", whole_fir, frac_fir);
 	} else {
-		sprintf(msg, "FIR test failed! rmse = %d.%06d\r\n", whole, frac);
+		sprintf(msg, "FIR test failed! rmse = %d.%06d\r\n", whole_fir, frac_fir);
 	}
 
 	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
@@ -245,14 +252,45 @@ int main(void) {
 
 #endif
 
+#if ZADANIE == 3
+
+	// Inicjalizacja filtru FIR (wykorzystujemy współczynniki z Zadania 2 - dolnoprzepustowy)
+	// Zakładamy próbkowanie ok. 200Hz (HAL_Delay(5)) -> Cutoff ok. 10Hz (przy Fp=0.1 norm, Fs~200)
+	// W zadaniu jest, że filtr FIR filtruje próbka po próbce.
+	// Rozmiar stanu dla BLOCK_SIZE=1 to: numTaps + blockSize - 1 = numTaps
+	static float32_t firStateADC[NUM_TAPS];
+	arm_fir_instance_f32 S_ADC;
+	arm_fir_init_f32(&S_ADC, NUM_TAPS, FIR_COEFFS, firStateADC, 1);
+
+	// HAL_ADC_Start(&hadc1); // Przeniesione do pętli dla trybu One-Shot
+
+
+#endif
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	while (1) {
-		/* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
+	while (1) {
+#if ZADANIE == 3
+		HAL_ADC_Start(&hadc1);
+
+		HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+
+		adc_raw = HAL_ADC_GetValue(&hadc1);
+		adc_mV = (adc_raw * 3300) / 4095;
+
+		g_adc_raw = (float32_t)adc_raw;
+
+		// Filtracja próbka po próbce
+		arm_fir_f32(&S_ADC, (float32_t*)&g_adc_raw, (float32_t*)&g_adc_filtered, 1);
+
+		HAL_Delay(5);
+#endif
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
 	}
 	/* USER CODE END 3 */
 }
@@ -307,6 +345,55 @@ void SystemClock_Config(void) {
 	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK) {
 		Error_Handler();
 	}
+}
+
+/**
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC1_Init(void) {
+
+	/* USER CODE BEGIN ADC1_Init 0 */
+
+	/* USER CODE END ADC1_Init 0 */
+
+	ADC_ChannelConfTypeDef sConfig = { 0 };
+
+	/* USER CODE BEGIN ADC1_Init 1 */
+
+	/* USER CODE END ADC1_Init 1 */
+
+	/** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+	 */
+	hadc1.Instance = ADC1;
+	hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+	hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+	hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+	hadc1.Init.ContinuousConvMode = DISABLE;
+	hadc1.Init.DiscontinuousConvMode = DISABLE;
+	hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+	hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	hadc1.Init.NbrOfConversion = 1;
+	hadc1.Init.DMAContinuousRequests = DISABLE;
+	hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+	if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+	 */
+	sConfig.Channel = ADC_CHANNEL_3;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN ADC1_Init 2 */
+
+	/* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -423,6 +510,21 @@ static void MX_USB_OTG_FS_PCD_Init(void) {
 }
 
 /**
+ * Enable DMA controller clock
+ */
+static void MX_DMA_Init(void) {
+
+	/* DMA controller clock enable */
+	__HAL_RCC_DMA2_CLK_ENABLE();
+
+	/* DMA interrupt init */
+	/* DMA2_Stream0_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+
+}
+
+/**
  * @brief GPIO Initialization Function
  * @param None
  * @retval None
@@ -449,7 +551,7 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin : USER_Btn_Pin */
 	GPIO_InitStruct.Pin = USER_Btn_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 

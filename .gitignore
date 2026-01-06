@@ -26,3 +26,7 @@ LAB_12/.settings
 
 PROJEKT_TESTOWY_UART/Debug
 PROJEKT_TESTOWY_UART/.settings
+
+# Ignoruj duże pliki .pack (biblioteki CMSIS)
+**/PACK/
+*.pack

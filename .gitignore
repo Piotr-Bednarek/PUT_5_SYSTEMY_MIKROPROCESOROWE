@@ -1,32 +1,4 @@
 .metadata\
-LAB_01/Debug
-LAB_02/Debug
-LAB_04/Debug
-LAB_05/Debug
-LAB_06/Debug
-LAB_07/Debug
-LAB_08/Debug
-LAB_09/Debug
-LAB_10/Debug
-LAB_11/Debug
-LAB_12/Debug
+**/.settings/
 
-LAB_01/.settings
-LAB_02/.settings
-LAB_04/.settings
-LAB_05/.settings
-LAB_06/.settings
-LAB_07/.settings
-LAB_08/.settings
-LAB_09/.settings
-LAB_10/.settings
-LAB_11/.settings
-LAB_12/.settings
-
-
-PROJEKT_TESTOWY_UART/Debug
-PROJEKT_TESTOWY_UART/.settings
-
-# Ignoruj duże pliki .pack (biblioteki CMSIS)
-**/PACK/
-*.pack
+**/language.settings.xml
